@@ -32,6 +32,7 @@ class FE(BaseEstimator, TransformerMixin):
 
         X = self.__add_special_dates(X)
         X = self.__variable_interaction(X)
+        X = self.__future_info(X)
         X = self.__get_next_holiday_information(X)
         X = self.__get_past_holiday_information(X)
 
@@ -89,17 +90,6 @@ class FE(BaseEstimator, TransformerMixin):
 
         return X
 
-    def __variable_interaction(self, X):
-        cols = ["holiday", "shops_closed", "winter_school_holidays", "school_holidays"]
-
-        for i in range(len(cols)):
-            for j in range(i + 1, len(cols)):
-                X[f"{cols[i]}+{cols[j]}"] = X[cols[i]] + X[cols[j]]
-                X[f"{cols[i]}-{cols[j]}"] = X[cols[i]] - X[cols[j]]
-                X[f"{cols[i]}*{cols[j]}"] = X[cols[i]] * X[cols[j]]
-
-        return X
-
     def __add_special_dates(self, X):
         valentines_day = (X["day"] == 14) & (X["month"] == 2)
         X.loc[valentines_day, "holiday"] = 1
@@ -113,6 +103,35 @@ class FE(BaseEstimator, TransformerMixin):
         )
         X.loc[black_friday, "holiday"] = 1
         X.loc[black_friday, "holiday_name"] = "Black Friday"
+
+        return X
+
+    def __variable_interaction(self, X):
+        cols = ["holiday", "shops_closed", "winter_school_holidays", "school_holidays"]
+
+        for i in range(len(cols)):
+            for j in range(i + 1, len(cols)):
+                X[f"{cols[i]}+{cols[j]}"] = X[cols[i]] + X[cols[j]]
+                X[f"{cols[i]}-{cols[j]}"] = X[cols[i]] - X[cols[j]]
+                X[f"{cols[i]}*{cols[j]}"] = X[cols[i]] * X[cols[j]]
+
+        return X
+
+    def __future_info(self, X):
+        cols = [
+            "holiday",
+            "shops_closed",
+            "winter_school_holidays",
+            "school_holidays",
+        ]
+
+        windows = [-1, -7]
+
+        new_features_names = [
+            f"{col}_next_{window*-1}" for window in windows for col in cols
+        ]
+
+        X[new_features_names] = X.groupby("warehouse")[cols].shift(windows)
 
         return X
 
